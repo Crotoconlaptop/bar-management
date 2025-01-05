@@ -84,16 +84,16 @@ const OrdersList = () => {
   
     const subscription = supabase
       .channel('orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setOrders((prev) => [...prev, payload.new]);
-        } else if (payload.eventType === 'DELETE') {
-          setOrders((prev) => prev.filter((order) => order.id !== payload.old.id));
-        } else if (payload.eventType === 'UPDATE') {
-          setOrders((prev) =>
-            prev.map((order) => (order.id === payload.new.id ? payload.new : order))
-          );
-        }
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+        setOrders((prev) => [...prev, payload.new]);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, (payload) => {
+        setOrders((prev) => prev.filter((order) => order.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
+        setOrders((prev) =>
+          prev.map((order) => (order.id === payload.new.id ? payload.new : order))
+        );
       })
       .subscribe();
   
@@ -101,6 +101,7 @@ const OrdersList = () => {
       supabase.removeChannel(subscription);
     };
   }, []);
+  
   
   
   
