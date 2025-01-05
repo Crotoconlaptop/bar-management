@@ -8,11 +8,11 @@ const MissingProducts = () => {
   const [newProduct, setNewProduct] = useState('');
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
 
-  // Fetch products from the database
+  // Fetch all missing products from the database
   const fetchProducts = async () => {
-    const { data, error } = await supabase.from('missing_products').select('*');
+    const { data, error } = await supabase.from('missing_products').select('*').order('id', { ascending: true });
     if (error) {
-      console.error(error);
+      console.error('Error fetching products:', error.message);
       setNotification({ open: true, message: 'Failed to fetch products.', severity: 'error' });
     } else {
       setProducts(data || []);
@@ -26,14 +26,17 @@ const MissingProducts = () => {
       return;
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('missing_products')
-      .insert([{ name: newProduct.trim() }]);
+      .insert([{ name: newProduct.trim() }])
+      .select();
 
     if (error) {
-      console.error(error);
+      console.error('Error adding product:', error.message);
       setNotification({ open: true, message: 'Failed to add product.', severity: 'error' });
     } else {
+      // Add the new product to the local state immediately
+      setProducts((prevProducts) => [...prevProducts, data[0]]);
       setNewProduct('');
       setNotification({ open: true, message: 'Product added successfully!', severity: 'success' });
     }
@@ -44,14 +47,16 @@ const MissingProducts = () => {
     const { error } = await supabase.from('missing_products').delete().eq('id', id);
 
     if (error) {
-      console.error(error);
+      console.error('Error deleting product:', error.message);
       setNotification({ open: true, message: 'Failed to delete product.', severity: 'error' });
     } else {
+      // Update the state locally to reflect the deletion immediately
+      setProducts((prevProducts) => prevProducts.filter((product) => product.id !== id));
       setNotification({ open: true, message: 'Product deleted successfully!', severity: 'success' });
     }
   };
 
-  // Subscribe to real-time changes
+  // Subscribe to real-time changes in the table
   useEffect(() => {
     fetchProducts();
 
@@ -60,8 +65,9 @@ const MissingProducts = () => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'missing_products' },
-        () => {
-          fetchProducts(); // Fetch products on any change
+        (payload) => {
+          console.log('Realtime update received:', payload); // Debug
+          fetchProducts(); // Refresh the product list
         }
       )
       .subscribe();
