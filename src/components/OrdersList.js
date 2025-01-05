@@ -21,22 +21,22 @@ const OrdersList = () => {
   const addOrder = async () => {
     const now = new Date().toISOString();
     const orderName = `Order - ${now}`;
-
+  
     const productsArray = newOrder.products.split(',').map((product) => product.trim());
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('orders')
-      .insert([{ name: orderName, products: productsArray, status: 'pending' }])
-      .select();
-
+      .insert([{ name: orderName, products: productsArray, status: 'pending' }]);
+  
     if (error) {
       console.error(error);
       setNotification({ open: true, message: 'Failed to add order.', severity: 'error' });
-    } else if (data && data.length > 0) {
-      setOrders([...orders, data[0]]);
+    } else {
       setNewOrder({ products: '' });
       setNotification({ open: true, message: 'Order added successfully!', severity: 'success' });
+      // No se actualiza manualmente el estado local aquí.
     }
   };
+  
 
   const deleteOrder = async (id) => {
     const { error } = await supabase.from('orders').delete().eq('id', id);
@@ -81,28 +81,27 @@ const OrdersList = () => {
 
   useEffect(() => {
     fetchOrders();
-
+  
     const subscription = supabase
       .channel('orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setOrders((prev) => [...prev, payload.new]);
-        } else if (payload.eventType === 'DELETE') {
-          setOrders((prev) => prev.filter((order) => order.id !== payload.old.id));
-        } else if (payload.eventType === 'UPDATE') {
-          setOrders((prev) =>
-            prev.map((order) =>
-              order.id === payload.new.id ? payload.new : order
-            )
-          );
-        }
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+        setOrders((prev) => [...prev, payload.new]);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, (payload) => {
+        setOrders((prev) => prev.filter((order) => order.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
+        setOrders((prev) =>
+          prev.map((order) => (order.id === payload.new.id ? payload.new : order))
+        );
       })
       .subscribe();
-
+  
     return () => {
       supabase.removeChannel(subscription);
     };
   }, []);
+  
 
   return (
     <div>
