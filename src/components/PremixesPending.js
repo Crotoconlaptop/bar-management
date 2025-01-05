@@ -19,28 +19,41 @@ const PremixesPending = () => {
 
   useEffect(() => {
     fetchPremixes();
-
+  
     const subscription = supabase
       .channel('premixes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'premixes' }, (payload) => {
-        if (payload.eventType === 'INSERT' && !payload.new.status) {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'premixes' }, (payload) => {
+        if (!payload.new.status) {
           setPremixes((prev) => [...prev, payload.new]);
-        } else if (payload.eventType === 'DELETE') {
-          setPremixes((prev) => prev.filter((premix) => premix.id !== payload.old.id));
-        } else if (payload.eventType === 'UPDATE') {
-          setPremixes((prev) =>
-            payload.new.status
-              ? prev.filter((premix) => premix.id !== payload.new.id) // Filtrar si ya no está pendiente
-              : prev.map((premix) => (premix.id === payload.new.id ? payload.new : premix))
-          );
         }
       })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'premixes' }, (payload) => {
+        setPremixes((prev) => prev.filter((premix) => premix.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'premixes' }, (payload) => {
+        setPremixes((prev) => {
+          const isPending = !payload.new.status;
+          const exists = prev.some((premix) => premix.id === payload.new.id);
+  
+          if (isPending && !exists) {
+            // Si el premix ahora está pendiente y no está en la lista, lo agregamos
+            return [...prev, payload.new];
+          } else if (!isPending) {
+            // Si el premix ya no está pendiente, lo eliminamos de la lista
+            return prev.filter((premix) => premix.id !== payload.new.id);
+          } else {
+            // Si el premix sigue pendiente, simplemente lo actualizamos
+            return prev.map((premix) => (premix.id === payload.new.id ? payload.new : premix));
+          }
+        });
+      })
       .subscribe();
-
+  
     return () => {
       supabase.removeChannel(subscription);
     };
   }, []);
+  
 
   return (
     <div>
