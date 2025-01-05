@@ -95,26 +95,27 @@ const PremixesList = () => {
 
   useEffect(() => {
     fetchPremixes();
-
+  
     const subscription = supabase
       .channel('premixes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'premixes' }, (payload) => {
-        setPremixes((prev) => [...prev, payload.new]);
-      })
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'premixes' }, (payload) => {
-        setPremixes((prev) => prev.filter((premix) => premix.id !== payload.old.id));
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'premixes' }, (payload) => {
-        setPremixes((prev) =>
-          prev.map((premix) => (premix.id === payload.new.id ? payload.new : premix))
-        );
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'premixes' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setPremixes((prev) => [...prev, payload.new]);
+        } else if (payload.eventType === 'DELETE') {
+          setPremixes((prev) => prev.filter((premix) => premix.id !== payload.old.id));
+        } else if (payload.eventType === 'UPDATE') {
+          setPremixes((prev) =>
+            prev.map((premix) => (premix.id === payload.new.id ? payload.new : premix))
+          );
+        }
       })
       .subscribe();
-
+  
     return () => {
       supabase.removeChannel(subscription);
     };
   }, []);
+  
 
   return (
     <div>
