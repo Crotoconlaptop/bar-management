@@ -95,7 +95,7 @@ const PremixesList = () => {
 
   useEffect(() => {
     fetchPremixes();
-  
+
     const subscription = supabase
       .channel('premixes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'premixes' }, (payload) => {
@@ -110,12 +110,11 @@ const PremixesList = () => {
         );
       })
       .subscribe();
-  
+
     return () => {
       supabase.removeChannel(subscription);
     };
   }, []);
-  
 
   return (
     <div>
@@ -201,3 +200,4 @@ const PremixesList = () => {
 };
 
 export default PremixesList;
+

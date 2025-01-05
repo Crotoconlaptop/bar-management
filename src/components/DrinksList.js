@@ -75,16 +75,16 @@ const DrinksList = () => {
 
     const subscription = supabase
       .channel('drinks')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'drinks' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setDrinks((prev) => [...prev, payload.new]);
-        } else if (payload.eventType === 'DELETE') {
-          setDrinks((prev) => prev.filter((drink) => drink.id !== payload.old.id));
-        } else if (payload.eventType === 'UPDATE') {
-          setDrinks((prev) =>
-            prev.map((drink) => (drink.id === payload.new.id ? payload.new : drink))
-          );
-        }
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'drinks' }, (payload) => {
+        setDrinks((prev) => [...prev, payload.new]);
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'drinks' }, (payload) => {
+        setDrinks((prev) => prev.filter((drink) => drink.id !== payload.old.id));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'drinks' }, (payload) => {
+        setDrinks((prev) =>
+          prev.map((drink) => (drink.id === payload.new.id ? payload.new : drink))
+        );
       })
       .subscribe();
 
@@ -139,7 +139,13 @@ const DrinksList = () => {
               <img
                 src={drink.image}
                 alt={drink.name}
-                style={{ maxWidth: '150px', marginLeft: '10px', borderRadius: '8px' }}
+                style={{
+                  maxWidth: '150px',
+                  maxHeight: '150px',
+                  objectFit: 'cover',
+                  marginLeft: '10px',
+                  borderRadius: '8px',
+                }}
               />
             )}
             <IconButton color="error" onClick={() => deleteDrink(drink.id)}>

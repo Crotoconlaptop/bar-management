@@ -85,12 +85,15 @@ const OrdersList = () => {
     const subscription = supabase
       .channel('orders')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, (payload) => {
+        console.log('Realtime INSERT detected in orders:', payload);
         setOrders((prev) => [...prev, payload.new]);
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, (payload) => {
+        console.log('Realtime DELETE detected in orders:', payload);
         setOrders((prev) => prev.filter((order) => order.id !== payload.old.id));
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, (payload) => {
+        console.log('Realtime UPDATE detected in orders:', payload);
         setOrders((prev) =>
           prev.map((order) => (order.id === payload.new.id ? payload.new : order))
         );
@@ -101,6 +104,7 @@ const OrdersList = () => {
       supabase.removeChannel(subscription);
     };
   }, []);
+  
   
 
   return (
