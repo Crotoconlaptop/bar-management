@@ -68,7 +68,11 @@ const PremixesList = () => {
       console.error(error);
       setNotification({ open: true, message: 'Failed to update premix status.', severity: 'error' });
     } else {
-      fetchPremixes();
+      setPremixes((prev) =>
+        prev.map((premix) =>
+          premix.id === id ? { ...premix, status: !currentStatus } : premix
+        )
+      );
       setNotification({
         open: true,
         message: `Premix marked as ${!currentStatus ? 'Ready' : 'Pending'}`,
@@ -84,13 +88,34 @@ const PremixesList = () => {
       console.error(error);
       setNotification({ open: true, message: 'Failed to delete premix.', severity: 'error' });
     } else {
-      fetchPremixes();
+      setPremixes((prev) => prev.filter((premix) => premix.id !== id));
       setNotification({ open: true, message: 'Premix deleted successfully!', severity: 'success' });
     }
   };
 
   useEffect(() => {
     fetchPremixes();
+
+    const subscription = supabase
+      .channel('premixes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'premixes' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setPremixes((prev) => [...prev, payload.new]);
+        } else if (payload.eventType === 'DELETE') {
+          setPremixes((prev) => prev.filter((premix) => premix.id !== payload.old.id));
+        } else if (payload.eventType === 'UPDATE') {
+          setPremixes((prev) =>
+            prev.map((premix) =>
+              premix.id === payload.new.id ? payload.new : premix
+            )
+          );
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
   return (
@@ -136,20 +161,18 @@ const PremixesList = () => {
               secondary={`Status: ${premix.status ? 'Ready' : 'Pending'}`}
             />
             {premix.image && (
-  <img
-    src={premix.image}
-    alt={premix.name}
-    style={{
-      maxWidth: '150px',
-      maxHeight: '150px',
-      objectFit: 'cover',
-      marginLeft: '10px',
-      borderRadius: '8px',
-    }}
-  />
-)}
-
-            
+              <img
+                src={premix.image}
+                alt={premix.name}
+                style={{
+                  maxWidth: '150px',
+                  maxHeight: '150px',
+                  objectFit: 'cover',
+                  marginLeft: '10px',
+                  borderRadius: '8px',
+                }}
+              />
+            )}
             <IconButton
               color={premix.status ? 'warning' : 'success'}
               onClick={() => toggleReadyStatus(premix.id, premix.status)}

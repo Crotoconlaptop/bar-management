@@ -60,17 +60,37 @@ const DrinksList = () => {
 
   const deleteDrink = async (id) => {
     const { error } = await supabase.from('drinks').delete().eq('id', id);
+
     if (error) {
       console.error(error);
       setNotification({ open: true, message: 'Failed to delete drink.', severity: 'error' });
     } else {
-      fetchDrinks();
+      setDrinks((prev) => prev.filter((drink) => drink.id !== id));
       setNotification({ open: true, message: 'Drink deleted successfully!', severity: 'success' });
     }
   };
 
   useEffect(() => {
     fetchDrinks();
+
+    const subscription = supabase
+      .channel('drinks')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'drinks' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setDrinks((prev) => [...prev, payload.new]);
+        } else if (payload.eventType === 'DELETE') {
+          setDrinks((prev) => prev.filter((drink) => drink.id !== payload.old.id));
+        } else if (payload.eventType === 'UPDATE') {
+          setDrinks((prev) =>
+            prev.map((drink) => (drink.id === payload.new.id ? payload.new : drink))
+          );
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
   return (
@@ -116,7 +136,11 @@ const DrinksList = () => {
               secondary={`Ingredients: ${drink.ingredients}, Preparation: ${drink.preparation}`}
             />
             {drink.image && (
-              <img src={drink.image} alt={drink.name} style={{ maxWidth: '100px', marginLeft: '10px' }} />
+              <img
+                src={drink.image}
+                alt={drink.name}
+                style={{ maxWidth: '150px', marginLeft: '10px', borderRadius: '8px' }}
+              />
             )}
             <IconButton color="error" onClick={() => deleteDrink(drink.id)}>
               <DeleteIcon />

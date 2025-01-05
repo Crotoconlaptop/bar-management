@@ -9,7 +9,7 @@ const OrdersList = () => {
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
 
   const fetchOrders = async () => {
-    const { data, error } = await supabase.from('orders').select('*');
+    const { data, error } = await supabase.from('orders').select('*').order('id', { ascending: true });
     if (error) {
       console.error(error);
       setNotification({ open: true, message: 'Failed to fetch orders.', severity: 'error' });
@@ -45,7 +45,7 @@ const OrdersList = () => {
       console.error(error);
       setNotification({ open: true, message: 'Failed to delete order.', severity: 'error' });
     } else {
-      fetchOrders();
+      setOrders((prev) => prev.filter((order) => order.id !== id));
       setNotification({ open: true, message: 'Order deleted successfully!', severity: 'success' });
     }
   };
@@ -68,13 +68,40 @@ const OrdersList = () => {
       console.error(error);
       setNotification({ open: true, message: 'Failed to update order.', severity: 'error' });
     } else {
-      fetchOrders();
+      setOrders((prev) =>
+        prev.map((order) =>
+          order.id === id
+            ? { ...order, status: 'received', received_by: receivedBy, comment }
+            : order
+        )
+      );
       setNotification({ open: true, message: 'Order marked as received!', severity: 'success' });
     }
   };
 
   useEffect(() => {
     fetchOrders();
+
+    const subscription = supabase
+      .channel('orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setOrders((prev) => [...prev, payload.new]);
+        } else if (payload.eventType === 'DELETE') {
+          setOrders((prev) => prev.filter((order) => order.id !== payload.old.id));
+        } else if (payload.eventType === 'UPDATE') {
+          setOrders((prev) =>
+            prev.map((order) =>
+              order.id === payload.new.id ? payload.new : order
+            )
+          );
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
   return (
@@ -105,11 +132,7 @@ const OrdersList = () => {
               }`}
             />
             {order.status !== 'received' && (
-              <Button
-                variant="contained"
-                color="success"
-                onClick={() => markAsReceived(order.id)}
-              >
+              <Button variant="contained" color="success" onClick={() => markAsReceived(order.id)}>
                 Mark as Received
               </Button>
             )}
