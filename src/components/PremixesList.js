@@ -8,16 +8,22 @@ const PremixesList = () => {
   const [newPremix, setNewPremix] = useState({ name: '', ingredients: '', preparation: '', image: null });
   const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
 
+  // Fetch all premixes from the database
   const fetchPremixes = async () => {
-    const { data, error } = await supabase.from('premixes').select('*');
+    const { data, error } = await supabase
+      .from('premixes')
+      .select('*')
+      .order('id', { ascending: true }); // Order by ID
+
     if (error) {
-      console.error(error);
+      console.error('Error fetching premixes:', error.message);
       setNotification({ open: true, message: 'Failed to fetch premixes.', severity: 'error' });
     } else {
-      setPremixes(data || []);
+      setPremixes(data || []); // Update state with fetched data
     }
   };
 
+  // Upload image to Supabase storage and get public URL
   const uploadImage = async (file) => {
     const fileName = `${Date.now()}-${file.name}`;
     const { data, error } = await supabase.storage.from('images').upload(fileName, file);
@@ -28,11 +34,18 @@ const PremixesList = () => {
       return null;
     }
 
-    const { publicUrl } = supabase.storage.from('images').getPublicUrl(fileName);
-    console.log('Generated Public URL:', publicUrl); // Depuración de la URL
-    return publicUrl;
+    const { data: publicUrlData, error: publicUrlError } = supabase.storage.from('images').getPublicUrl(fileName);
+
+    if (publicUrlError) {
+      console.error('Error generating public URL:', publicUrlError.message);
+      setNotification({ open: true, message: 'Failed to generate public URL.', severity: 'error' });
+      return null;
+    }
+
+    return publicUrlData.publicUrl;
   };
 
+  // Add a new premix
   const addPremix = async () => {
     if (!newPremix.name.trim() || !newPremix.ingredients.trim() || !newPremix.preparation.trim()) {
       setNotification({ open: true, message: 'All fields are required.', severity: 'error' });
@@ -44,21 +57,20 @@ const PremixesList = () => {
       imageUrl = await uploadImage(newPremix.image);
     }
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('premixes')
-      .insert([{ ...newPremix, image: imageUrl, status: false }])
-      .select();
+      .insert([{ ...newPremix, image: imageUrl, status: false }]);
 
     if (error) {
       console.error(error);
       setNotification({ open: true, message: 'Failed to add premix.', severity: 'error' });
-    } else if (data && data.length > 0) {
-      setPremixes([...premixes, data[0]]);
+    } else {
       setNewPremix({ name: '', ingredients: '', preparation: '', image: null });
       setNotification({ open: true, message: 'Premix added successfully!', severity: 'success' });
     }
   };
 
+  // Toggle ready status
   const toggleReadyStatus = async (id, currentStatus) => {
     const { error } = await supabase
       .from('premixes')
@@ -69,11 +81,6 @@ const PremixesList = () => {
       console.error(error);
       setNotification({ open: true, message: 'Failed to update premix status.', severity: 'error' });
     } else {
-      setPremixes((prev) =>
-        prev.map((premix) =>
-          premix.id === id ? { ...premix, status: !currentStatus } : premix
-        )
-      );
       setNotification({
         open: true,
         message: `Premix marked as ${!currentStatus ? 'Ready' : 'Pending'}`,
@@ -82,6 +89,7 @@ const PremixesList = () => {
     }
   };
 
+  // Delete a premix
   const deletePremix = async (id) => {
     const { error } = await supabase.from('premixes').delete().eq('id', id);
 
@@ -89,18 +97,21 @@ const PremixesList = () => {
       console.error(error);
       setNotification({ open: true, message: 'Failed to delete premix.', severity: 'error' });
     } else {
-      setPremixes((prev) => prev.filter((premix) => premix.id !== id));
       setNotification({ open: true, message: 'Premix deleted successfully!', severity: 'success' });
     }
   };
 
+  // Subscribe to real-time updates
   useEffect(() => {
     fetchPremixes();
-  
+
     const subscription = supabase
       .channel('premixes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'premixes' }, (payload) => {
-        setPremixes((prev) => [...prev, payload.new]);
+        setPremixes((prev) => {
+          const alreadyExists = prev.some((premix) => premix.id === payload.new.id);
+          return alreadyExists ? prev : [...prev, payload.new];
+        });
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'premixes' }, (payload) => {
         setPremixes((prev) => prev.filter((premix) => premix.id !== payload.old.id));
@@ -111,13 +122,11 @@ const PremixesList = () => {
         );
       })
       .subscribe();
-  
+
     return () => {
       supabase.removeChannel(subscription);
     };
   }, []);
-  
-  
 
   return (
     <div>
@@ -159,7 +168,9 @@ const PremixesList = () => {
           <ListItem key={premix.id} divider>
             <ListItemText
               primary={premix.name}
-              secondary={`Status: ${premix.status ? 'Ready' : 'Pending'}`}
+              secondary={`Ingredients: ${premix.ingredients} | Preparation: ${premix.preparation} | Status: ${
+                premix.status ? 'Ready' : 'Pending'
+              }`}
             />
             {premix.image && (
               <img
@@ -178,7 +189,7 @@ const PremixesList = () => {
               color={premix.status ? 'warning' : 'success'}
               onClick={() => toggleReadyStatus(premix.id, premix.status)}
             >
-              {premix.status ? 'Mark as Pending' : 'Mark as Ready'}
+              {premix.status ? 'Pending' : 'Ready'}
             </IconButton>
             <IconButton color="error" onClick={() => deletePremix(premix.id)}>
               <DeleteIcon />
@@ -203,4 +214,3 @@ const PremixesList = () => {
 };
 
 export default PremixesList;
-
