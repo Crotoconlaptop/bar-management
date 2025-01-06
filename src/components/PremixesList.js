@@ -29,6 +29,7 @@ const PremixesList = () => {
     }
 
     const { publicUrl } = supabase.storage.from('images').getPublicUrl(fileName);
+    console.log('Generated Public URL:', publicUrl); // Depuración de la URL
     return publicUrl;
   };
 
