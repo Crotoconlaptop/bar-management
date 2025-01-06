@@ -164,39 +164,74 @@ const PremixesList = () => {
         Add Premix
       </Button>
       <List>
-        {premixes.map((premix) => (
-          <ListItem key={premix.id} divider>
-            <ListItemText
-              primary={premix.name}
-              secondary={`Ingredients: ${premix.ingredients} | Preparation: ${premix.preparation} | Status: ${
-                premix.status ? 'Ready' : 'Pending'
-              }`}
-            />
-            {premix.image && (
-              <img
-                src={premix.image}
-                alt={premix.name}
-                style={{
-                  maxWidth: '150px',
-                  maxHeight: '150px',
-                  objectFit: 'cover',
-                  marginLeft: '10px',
-                  borderRadius: '8px',
-                }}
-              />
-            )}
-            <IconButton
-              color={premix.status ? 'warning' : 'success'}
-              onClick={() => toggleReadyStatus(premix.id, premix.status)}
-            >
-              {premix.status ? 'Pending' : 'Ready'}
-            </IconButton>
-            <IconButton color="error" onClick={() => deletePremix(premix.id)}>
-              <DeleteIcon />
-            </IconButton>
-          </ListItem>
-        ))}
-      </List>
+  {premixes.map((premix) => (
+    <ListItem
+      key={premix.id}
+      divider
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: '8px',
+      }}
+    >
+      {/* Imagen del Premix */}
+      {premix.image && (
+        <img
+          src={premix.image}
+          alt={premix.name}
+          style={{
+            width: '100%',
+            maxWidth: '300px',
+            height: 'auto',
+            objectFit: 'cover',
+            borderRadius: '8px',
+          }}
+        />
+      )}
+
+      {/* Detalles del Premix */}
+      <div style={{ width: '100%' }}>
+        <ListItemText
+          primary={premix.name}
+          secondary={`Ingredients: ${premix.ingredients} | Preparation: ${premix.preparation} | Status: ${
+            premix.status ? 'Ready' : 'Pending'
+          }`}
+          style={{ marginBottom: '8px' }}
+        />
+      </div>
+
+      {/* Botones Compactos */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          width: '100%',
+        }}
+      >
+        <IconButton
+          color={premix.status ? 'warning' : 'success'}
+          onClick={() => toggleReadyStatus(premix.id, premix.status)}
+        >
+          {premix.status ? (
+            <span role="img" aria-label="pending">
+              ⏳
+            </span>
+          ) : (
+            <span role="img" aria-label="ready">
+              ✅
+            </span>
+          )}
+        </IconButton>
+
+        <IconButton color="error" onClick={() => deletePremix(premix.id)}>
+          <DeleteIcon />
+        </IconButton>
+      </div>
+    </ListItem>
+  ))}
+</List>
+
       <Snackbar
         open={notification.open}
         autoHideDuration={4000}
